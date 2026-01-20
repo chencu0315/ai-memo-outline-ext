@@ -208,11 +208,28 @@ function scrollToAnswer(questionId) {
   if (questionIndex < allAiMessages.length) {
     const aiMessage = allAiMessages[questionIndex];
     
-    /* 滚动到 AI 回答 */
+    /* 先滚动到元素 */
     aiMessage.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
+
+    /* 滚动完成后，向下微调一点距离 */
+    /* 尝试找到滚动容器 */
+    let scrollContainer = findScrollContainer(aiMessage);
+    const scrollOffset = 80; /* 向下偏移的距离 */
+
+    if (scrollContainer) {
+      scrollContainer.scrollBy({
+        top: -scrollOffset,
+        behavior: "smooth",
+      });
+    } else {
+      window.scrollBy({
+        top: -scrollOffset,
+        behavior: "smooth",
+      });
+    }
 
     /* 高亮 AI 回答 */
     highlightElement(aiMessage, "rgba(16, 185, 129, 0.5)");
@@ -235,6 +252,24 @@ function highlightElement(element, color = "rgba(102, 126, 234, 0.5)") {
   setTimeout(() => {
     element.style.boxShadow = "";
   }, 1500);
+}
+
+/* 查找滚动容器 */
+function findScrollContainer(element) {
+  let el = element.parentElement;
+  while (el) {
+    const style = getComputedStyle(el);
+    if (
+      style.overflow === "auto" ||
+      style.overflow === "scroll" ||
+      style.overflowY === "auto" ||
+      style.overflowY === "scroll"
+    ) {
+      return el;
+    }
+    el = el.parentElement;
+  }
+  return null;
 }
 
 /* 移除 DOM */
