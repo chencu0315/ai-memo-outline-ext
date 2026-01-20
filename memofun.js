@@ -207,26 +207,29 @@ function scrollToAnswer(questionId) {
   /* 找到对应索引的 AI 回答 */
   if (questionIndex < allAiMessages.length) {
     const aiMessage = allAiMessages[questionIndex];
-    
-    /* 先滚动到元素 */
-    aiMessage.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    const topOffset = 80; /* 顶部留出的间距 */
 
-    /* 滚动完成后，向下微调一点距离 */
     /* 尝试找到滚动容器 */
-    let scrollContainer = findScrollContainer(aiMessage);
-    const scrollOffset = 80; /* 向下偏移的距离 */
+    const scrollContainer = findScrollContainer(aiMessage);
 
     if (scrollContainer) {
-      scrollContainer.scrollBy({
-        top: -scrollOffset,
+      /* 有自定义滚动容器 */
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elementRect = aiMessage.getBoundingClientRect();
+      const relativeTop =
+        elementRect.top - containerRect.top + scrollContainer.scrollTop;
+
+      scrollContainer.scrollTo({
+        top: relativeTop - topOffset,
         behavior: "smooth",
       });
     } else {
-      window.scrollBy({
-        top: -scrollOffset,
+      /* 使用 window 滚动，计算绝对位置 */
+      const elementRect = aiMessage.getBoundingClientRect();
+      const absoluteTop = elementRect.top + window.scrollY;
+
+      window.scrollTo({
+        top: absoluteTop - topOffset,
         behavior: "smooth",
       });
     }
