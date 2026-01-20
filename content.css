@@ -165,6 +165,65 @@
   color: #2d3748;
 }
 
+/* ========== 跳转回答按钮 ========== */
+.maodian-goto-answer {
+  position: relative;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f3f4;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.maodian-item:hover .maodian-goto-answer {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.maodian-goto-answer:hover {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.maodian-goto-answer svg {
+  width: 16px;
+  height: 16px;
+  fill: #6b7280;
+  transition: fill 0.25s ease;
+}
+
+.maodian-goto-answer:hover svg {
+  fill: #ffffff;
+}
+
+/* 提示文字 */
+.maodian-goto-answer::after {
+  content: "跳转回答";
+  position: absolute;
+  right: 100%;
+  margin-right: 8px;
+  padding: 4px 8px;
+  background: #1f2937;
+  color: #fff;
+  font-size: 11px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.maodian-goto-answer:hover::after {
+  opacity: 1;
+}
+
 /* ========== 底部工具栏 ========== */
 .custom-tool-warp {
   display: flex;

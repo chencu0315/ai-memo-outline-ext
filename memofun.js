@@ -8,6 +8,8 @@ const SELECTORS = {
   userMessageText: ".whitespace-pre-wrap",
   chatInput: "textarea",
   sidebarMenu: '[class*="sidebar"], [class*="conversation-list"], nav',
+  /* AI 回答选择器 */
+  aiMessage: '[data-message-author-role="assistant"]',
 };
 
 /* SVG 图标 */
@@ -16,6 +18,7 @@ const ICONS = {
   refresh: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>`,
   close: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`,
   empty: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>`,
+  gotoAnswer: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>`,
 };
 
 /* 获取问题列表数据 */
@@ -98,6 +101,9 @@ function createDomInBody(list = []) {
         <div class="maodian-item" data-target="${item.id}" title="${escapeHtml(item.question)}">
           <div class="maodian-index">${i + 1}</div>
           <div class="maodian-text">${escapeHtml(item.question)}</div>
+          <div class="maodian-goto-answer" data-answer="${item.id}" title="跳转到AI回答">
+            ${ICONS.gotoAnswer}
+          </div>
         </div>
       `;
     });
@@ -137,6 +143,15 @@ function escapeHtml(text) {
 
 /* 锚点跳转处理 */
 function handleClickMao(event) {
+  /* 检查是否点击了跳转回答按钮 */
+  const answerBtn = event.target.closest(".maodian-goto-answer");
+  if (answerBtn) {
+    event.stopPropagation();
+    const questionId = answerBtn.dataset.answer;
+    scrollToAnswer(questionId);
+    return;
+  }
+
   const target = event.target.closest("[data-target]");
   if (!target) return;
 
@@ -164,12 +179,62 @@ function handleClickMao(event) {
     });
 
     /* 添加高亮动画效果 */
-    targetElement.style.transition = "box-shadow 0.3s ease";
-    targetElement.style.boxShadow = "0 0 0 3px rgba(102, 126, 234, 0.5)";
-    setTimeout(() => {
-      targetElement.style.boxShadow = "";
-    }, 1500);
+    highlightElement(targetElement);
   }
+}
+
+/* 跳转到AI回答 */
+function scrollToAnswer(questionId) {
+  const questionElement = document.getElementById(questionId);
+  if (!questionElement) return;
+
+  /* 获取所有用户消息，找出当前问题的索引 */
+  const allUserMessages = document.querySelectorAll(SELECTORS.userMessage);
+  let questionIndex = -1;
+  
+  for (let i = 0; i < allUserMessages.length; i++) {
+    if (allUserMessages[i].id === questionId) {
+      questionIndex = i;
+      break;
+    }
+  }
+
+  if (questionIndex === -1) return;
+
+  /* 获取所有 AI 回答 */
+  const allAiMessages = document.querySelectorAll(SELECTORS.aiMessage);
+  
+  /* 找到对应索引的 AI 回答 */
+  if (questionIndex < allAiMessages.length) {
+    const aiMessage = allAiMessages[questionIndex];
+    
+    /* 滚动到 AI 回答 */
+    aiMessage.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    /* 高亮 AI 回答 */
+    highlightElement(aiMessage, "rgba(16, 185, 129, 0.5)");
+  } else {
+    /* 如果没有找到对应的 AI 回答，滚动到问题底部 */
+    const rect = questionElement.getBoundingClientRect();
+    const elementBottom = rect.bottom + window.scrollY;
+    
+    window.scrollTo({
+      top: elementBottom - 80,
+      behavior: "smooth",
+    });
+  }
+}
+
+/* 高亮元素 */
+function highlightElement(element, color = "rgba(102, 126, 234, 0.5)") {
+  element.style.transition = "box-shadow 0.3s ease";
+  element.style.boxShadow = `0 0 0 3px ${color}`;
+  setTimeout(() => {
+    element.style.boxShadow = "";
+  }, 1500);
 }
 
 /* 移除 DOM */
