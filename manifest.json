@@ -5,25 +5,13 @@
   "manifest_version": 3,
   "content_scripts": [
     {
-      "matches": ["https://chat.deepseek.com/", "https://chat.deepseek.com/a/*"],
-      "run_at": "document_idle",
-      "js": ["utils.js","deepseek.js"],
-      "css": ["content.css"]
-    },
-    {
-      "matches": ["https://www.doubao.com/chat/*"],
-      "run_at": "document_idle",
-      "js": ["utils.js","doubao.js"],
-      "css": ["content.css"]
-    },
-    {
-      "matches": ["https://yiyan.baidu.com/", "https://yiyan.baidu.com/chat/*"],
-      "run_at": "document_idle",
-      "js": ["utils.js","yiyan.js"],
-      "css": ["content.css"]
-    },
-    {
       "matches": ["https://a.memofun.net/", "https://a.memofun.net/*"],
+      "run_at": "document_idle",
+      "js": ["utils.js","memofun.js"],
+      "css": ["content.css"]
+    },
+    {
+      "matches": ["https://mana-x.aizex.net/", "https://mana-x.aizex.net/*"],
       "run_at": "document_idle",
       "js": ["utils.js","memofun.js"],
       "css": ["content.css"]
