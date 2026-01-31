@@ -1,6 +1,7 @@
 let timer = null;
 let lastUrl = location.href;
 let isPanelVisible = true;
+let messageObserver = null;
 
 /* 选择器配置 */
 const SELECTORS = {
@@ -8,8 +9,9 @@ const SELECTORS = {
   userMessageText: ".whitespace-pre-wrap",
   chatInput: "textarea",
   sidebarMenu: '[class*="sidebar"], [class*="conversation-list"], nav',
-  /* AI 回答选择器 */
   aiMessage: '[data-message-author-role="assistant"]',
+  /* 消息容器，用于监听新消息 */
+  messageContainer: '[class*="react-scroll-to-bottom"], [class*="chat-messages"], main',
 };
 
 /* SVG 图标 */
@@ -18,8 +20,26 @@ const ICONS = {
   refresh: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>`,
   close: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`,
   empty: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>`,
-  gotoAnswer: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>`,
+  goAnswer: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>`,
 };
+
+/* 查找滚动容器 */
+function findScrollContainer(element) {
+  let el = element?.parentElement;
+  while (el) {
+    const style = getComputedStyle(el);
+    if (
+      style.overflow === "auto" ||
+      style.overflow === "scroll" ||
+      style.overflowY === "auto" ||
+      style.overflowY === "scroll"
+    ) {
+      return el;
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
 
 /* 获取问题列表数据 */
 function handleQustionListByPage(delay = 1500) {
@@ -34,12 +54,15 @@ function handleQustionListByPage(delay = 1500) {
       for (let i = 0; i < doms.length; i++) {
         const id = window._customFun?.randomNum(10, "zimu");
         doms[i].setAttribute("id", id);
+        /* 同时存储索引，用于跳转到对应的AI回答 */
+        doms[i].setAttribute("data-question-index", i);
 
         const textDom = doms[i].querySelector(SELECTORS.userMessageText);
         const text = textDom ? textDom.innerText : doms[i].innerText;
 
         question.push({
           id,
+          index: i,
           question: text,
         });
       }
@@ -48,10 +71,61 @@ function handleQustionListByPage(delay = 1500) {
     const chatInput = document.querySelector(SELECTORS.chatInput);
     if (chatInput) {
       createDomInBody(question);
+      /* 开始监听新消息 */
+      observeNewMessages();
     } else {
       removeDom();
+      stopObservingMessages();
     }
   }, delay);
+}
+
+/* 监听新消息（用于发送新对话后自动刷新） */
+function observeNewMessages() {
+  /* 如果已经在监听，先停止 */
+  stopObservingMessages();
+
+  /* 找到消息容器 */
+  const userMsg = document.querySelector(SELECTORS.userMessage);
+  if (!userMsg) return;
+
+  /* 向上查找一个合适的容器来监听 */
+  let container = userMsg.parentElement;
+  for (let i = 0; i < 10 && container; i++) {
+    if (container.children.length > 2) {
+      break;
+    }
+    container = container.parentElement;
+  }
+
+  if (!container) return;
+
+  let lastMessageCount = document.querySelectorAll(SELECTORS.userMessage).length;
+
+  messageObserver = new MutationObserver(
+    window._customFun?.debounce(() => {
+      const currentCount = document.querySelectorAll(SELECTORS.userMessage).length;
+      /* 如果用户消息数量增加，说明发送了新消息 */
+      if (currentCount > lastMessageCount) {
+        console.log("[问题目录] 检测到新消息，自动刷新...");
+        lastMessageCount = currentCount;
+        handleQustionListByPage(1000);
+      }
+    }, 1000)
+  );
+
+  messageObserver.observe(container, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+/* 停止监听新消息 */
+function stopObservingMessages() {
+  if (messageObserver) {
+    messageObserver.disconnect();
+    messageObserver = null;
+  }
 }
 
 /* 创建切换按钮 */
@@ -98,11 +172,11 @@ function createDomInBody(list = []) {
   } else {
     list.forEach((item, i) => {
       contentHtml += `
-        <div class="maodian-item" data-target="${item.id}" title="${escapeHtml(item.question)}">
+        <div class="maodian-item" data-target="${item.id}" data-index="${item.index}" title="${escapeHtml(item.question)}">
           <div class="maodian-index">${i + 1}</div>
           <div class="maodian-text">${escapeHtml(item.question)}</div>
-          <div class="maodian-goto-answer" data-answer="${item.id}" title="跳转到AI回答">
-            ${ICONS.gotoAnswer}
+          <div class="maodian-go-answer" data-target-answer="${item.index}" title="跳转回答">
+            ${ICONS.goAnswer}
           </div>
         </div>
       `;
@@ -141,14 +215,39 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+/* 滚动到元素顶部（带间距） */
+function scrollToElementTop(element, offset = 80) {
+  if (!element) return;
+
+  const scrollContainer = findScrollContainer(element);
+  const rect = element.getBoundingClientRect();
+
+  if (scrollContainer) {
+    /* 有自定义滚动容器 */
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const targetScrollTop =
+      scrollContainer.scrollTop + rect.top - containerRect.top - offset;
+    scrollContainer.scrollTo({
+      top: targetScrollTop,
+      behavior: "smooth",
+    });
+  } else {
+    /* 使用 window 滚动 */
+    const targetScrollTop = window.scrollY + rect.top - offset;
+    window.scrollTo({
+      top: targetScrollTop,
+      behavior: "smooth",
+    });
+  }
+}
+
 /* 锚点跳转处理 */
 function handleClickMao(event) {
   /* 检查是否点击了跳转回答按钮 */
-  const answerBtn = event.target.closest(".maodian-goto-answer");
+  const answerBtn = event.target.closest("[data-target-answer]");
   if (answerBtn) {
-    event.stopPropagation();
-    const questionId = answerBtn.dataset.answer;
-    scrollToAnswer(questionId);
+    const answerIndex = parseInt(answerBtn.dataset.targetAnswer, 10);
+    scrollToAnswer(answerIndex);
     return;
   }
 
@@ -171,108 +270,47 @@ function handleClickMao(event) {
     return;
   }
 
+  /* 跳转到问题 - 使用顶部对齐 */
   const targetElement = document.getElementById(targetId);
   if (targetElement) {
-    targetElement.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
+    scrollToElementTop(targetElement, 80);
 
     /* 添加高亮动画效果 */
-    highlightElement(targetElement);
+    targetElement.style.transition = "box-shadow 0.3s ease";
+    targetElement.style.boxShadow = "0 0 0 3px rgba(102, 126, 234, 0.5)";
+    setTimeout(() => {
+      targetElement.style.boxShadow = "";
+    }, 1500);
   }
 }
 
 /* 跳转到AI回答 */
-function scrollToAnswer(questionId) {
-  const questionElement = document.getElementById(questionId);
-  if (!questionElement) return;
-
-  /* 获取所有用户消息，找出当前问题的索引 */
-  const allUserMessages = document.querySelectorAll(SELECTORS.userMessage);
-  let questionIndex = -1;
-  
-  for (let i = 0; i < allUserMessages.length; i++) {
-    if (allUserMessages[i].id === questionId) {
-      questionIndex = i;
-      break;
-    }
-  }
-
-  if (questionIndex === -1) return;
-
+function scrollToAnswer(questionIndex) {
   /* 获取所有 AI 回答 */
-  const allAiMessages = document.querySelectorAll(SELECTORS.aiMessage);
-  
-  /* 找到对应索引的 AI 回答 */
-  if (questionIndex < allAiMessages.length) {
-    const aiMessage = allAiMessages[questionIndex];
-    const topOffset = 80; /* 顶部留出的间距 */
+  const aiMessages = document.querySelectorAll(SELECTORS.aiMessage);
 
-    /* 尝试找到滚动容器 */
-    const scrollContainer = findScrollContainer(aiMessage);
-
-    if (scrollContainer) {
-      /* 有自定义滚动容器 */
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const elementRect = aiMessage.getBoundingClientRect();
-      const relativeTop =
-        elementRect.top - containerRect.top + scrollContainer.scrollTop;
-
-      scrollContainer.scrollTo({
-        top: relativeTop - topOffset,
-        behavior: "smooth",
-      });
-    } else {
-      /* 使用 window 滚动，计算绝对位置 */
-      const elementRect = aiMessage.getBoundingClientRect();
-      const absoluteTop = elementRect.top + window.scrollY;
-
-      window.scrollTo({
-        top: absoluteTop - topOffset,
-        behavior: "smooth",
-      });
-    }
-
-    /* 高亮 AI 回答 */
-    highlightElement(aiMessage, "rgba(16, 185, 129, 0.5)");
-  } else {
-    /* 如果没有找到对应的 AI 回答，滚动到问题底部 */
-    const rect = questionElement.getBoundingClientRect();
-    const elementBottom = rect.bottom + window.scrollY;
-    
-    window.scrollTo({
-      top: elementBottom - 80,
-      behavior: "smooth",
-    });
+  if (aiMessages.length === 0) {
+    console.log("[问题目录] 未找到AI回答");
+    return;
   }
-}
 
-/* 高亮元素 */
-function highlightElement(element, color = "rgba(102, 126, 234, 0.5)") {
-  element.style.transition = "box-shadow 0.3s ease";
-  element.style.boxShadow = `0 0 0 3px ${color}`;
+  /* 通过索引找到对应的 AI 回答 */
+  const targetAnswer = aiMessages[questionIndex];
+
+  if (!targetAnswer) {
+    console.log("[问题目录] 未找到对应索引的AI回答:", questionIndex);
+    return;
+  }
+
+  /* 滚动到元素顶部 */
+  scrollToElementTop(targetAnswer, 80);
+
+  /* 添加高亮效果 */
+  targetAnswer.style.transition = "box-shadow 0.3s ease";
+  targetAnswer.style.boxShadow = "0 0 0 3px rgba(34, 197, 94, 0.5)";
   setTimeout(() => {
-    element.style.boxShadow = "";
+    targetAnswer.style.boxShadow = "";
   }, 1500);
-}
-
-/* 查找滚动容器 */
-function findScrollContainer(element) {
-  let el = element.parentElement;
-  while (el) {
-    const style = getComputedStyle(el);
-    if (
-      style.overflow === "auto" ||
-      style.overflow === "scroll" ||
-      style.overflowY === "auto" ||
-      style.overflowY === "scroll"
-    ) {
-      return el;
-    }
-    el = el.parentElement;
-  }
-  return null;
 }
 
 /* 移除 DOM */
@@ -286,6 +324,7 @@ function removeDom() {
 /* 移除所有相关 DOM（包括按钮） */
 function removeAllDom() {
   removeDom();
+  stopObservingMessages();
   const toggleBtn = document.getElementById("maodian-toggle-btn");
   if (toggleBtn) {
     document.body.removeChild(toggleBtn);
@@ -303,6 +342,16 @@ function handleSendNewQuestion() {
         handleQustionListByPage(2000);
       }, 2000)
     );
+
+    /* 监听回车发送 */
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        /* 延迟刷新，等待消息发送完成 */
+        setTimeout(() => {
+          handleQustionListByPage(2000);
+        }, 1500);
+      }
+    });
   }
 }
 
